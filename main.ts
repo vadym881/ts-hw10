@@ -1,77 +1,120 @@
+interface IPropertyDescriptor<K> {
+  value: K;
+  writable: boolean;
+  enumerable: boolean;
+  configurable: boolean
+}
+
+interface IBook {
+  title: string;
+  price: number;
+}
+
 interface IBankCard {
   bank: string;
   type: "visa" | "mastercard";
 }
 
-const user = {
+interface ICrypto {
+  title: 'btc' | 'eth' | 'ltc'
+  rate: number
+}
+
+class User {
+  name: string;
+  age: number;
+  bankCards: IBankCard[] = [];
+  cryptos?: ICrypto[] = [];
+  constructor(name: string, age: number) {
+    this.name = name;
+    this.age = age;
+  }
+}
+
+const user: User = {
   name: "John",
   age: 42,
   bankCards: [
-    <IBankCard>{ bank: "monobank", type: "visa" },
-    <IBankCard>{ bank: "privatbank", type: "mastercard" },
+    { bank: "monobank", type: "visa" },
+    { bank: "privatbank", type: "mastercard" },
   ],
 };
 
 //Завдання #1: Доповнити функцію sortArray з минулого завдання
+const books: IBook[] = [{ title: '2 brothers', price: 200 }, { title: 'Friday', price: 150 }, { title: 'Cloud atlas', price: 250 }];
+function compareByKey<T extends object>(key: keyof T) {
+  return (a: T, b: T) => {
+      return Number(b[key]) - Number(a[key]);
+  };
+}
 function sortArray<T>(arr: T[], compareFn: (a: T, b: T) => number): T[] {
-    return arr.toSorted(compareFn);
-  }
+  return arr.toSorted(compareFn as (a: T, b: T) => number);
+}
+
+console.log(sortArray<IBook>(books, compareByKey<IBook>('price')))
 
 //Завдання #2: DeepReadonly
-//type ReadonlyUserType = Readonly<typeof user>;
-// const readonlyUser: ReadonlyUserType = user;
-// readonlyUser.bankCards.push({ bank: "aval", type: "mastercard" });
-// console.log(readonlyUser);
-
-// type DeepReadonlyUserType<T> = { readonly [P in keyof T]: T[P] };
-// const deepReadonlyUser: DeepReadonlyUserType<typeof user> = user;
-// deepReadonlyUser.bankCards.push({ bank: "pumb", type: "visa" });
-// console.log(deepReadonlyUser)
+const rUser: Readonly<User> = new User('igor', 27)
+//rUser.bankCards = user.bankCards;
+rUser.bankCards.push(...user.bankCards)
+type DeepReadonly<T> = { readonly [P in keyof T]: T[P] extends object ? Readonly<T[P]> : T[P] };
+const drUser: DeepReadonly<User> = new User('sergey', 28);
+drUser.bankCards.push({ bank: "pumb", type: "visa" });
 
 //Завдання #3: DeepRequireReadonly
+type DeepRequiredReadonly<T> = {
+  readonly [P in keyof T]-?: T[P] extends object ? Readonly<T[P]> : T[P]
+};
+const drrUser: DeepRequiredReadonly<User> = { ...user, cryptos: [{ title: 'btc', rate: 100000 }] }
+//drrUser.cryptos.push({title: 'btc', rate: 100000}) //did not work
+drrUser.bankCards.push({ bank: "pumb", type: "visa" });
 
 //Завдання #4: PartialByKeys
-type PartialByKeys = Omit<typeof user, keyof typeof user>;
-const partialUser: PartialByKeys = {
-  name: "Joe",
-  bankCards: [],
-};
-console.log(partialUser);
-
-//Завдання #5: ReadonlyByKeys
-type readonlyKeysType = 'name' | 'age';
-type p1 = Readonly<Pick<typeof user, readonlyKeysType>>;
-type p2 = Exclude<keyof typeof user, readonlyKeysType>
-type ReadonlyByKeys = p1 | p2;
-const readonlyByKeysUser: ReadonlyByKeys = {
-  name: "Igor",
-  age: 33,  
+type PartialByKeys<T, K extends keyof T> = Omit<T, K>;
+const pUser: PartialByKeys<User, 'age'> = {
+  name: "Semen",
   bankCards: []
 };
-readonlyByKeysUser.name = 'hello'
 
-console.log(readonlyByKeysUser);
+//Завдання #5: ReadonlyByKeys
+type ReadonlyByKeys<T, K extends keyof T> = {
+  [P in keyof T as P extends K ? never : P]: T[P]
+} & {
+  readonly [P in keyof T as P extends K ? P : never]: T[P]
+}
+const readonlyByKeysUser: ReadonlyByKeys<User, 'name'> = { ...user };
+readonlyByKeysUser.name = 'Oleg';
 
-//Завдання #6: MutableByKeys
-type MutableByKeys = Partial<Pick<typeof user, keyof typeof user>>;
-const mutableByKeysUser: MutableByKeys = {
-  ...readonlyByKeysUser,
-  name: "Ivan",
-  bankCards: [],
-};
-delete mutableByKeysUser.age;
-console.log(mutableByKeysUser);
-console.log(readonlyByKeysUser);
+//Завдання #6:
+type MutabaleByKeys<T, K extends keyof T> = {
+  -readonly [P in keyof T as P extends K ? P : never]: T[P]
+} & {
+  [P in keyof T as P extends K ? never : never]: T[P]
+}
+const mutableByKeysUser: MutabaleByKeys<User, 'name'> = { ...readonlyByKeysUser };
+mutableByKeysUser.name = 'Oleg';
 
 //Завдання #7: UpperCaseKeys
 type UpperCaseKeys<T> = {
   [K in keyof T as Uppercase<K & string>]: T[K];
 };
-const upperCaseUser: UpperCaseKeys<typeof user> = {
+const upperCaseUser: UpperCaseKeys<User> = {
   NAME: "Anton",
   AGE: 42,
   BANKCARDS: [],
 };
-console.log(upperCaseUser);
 
 //Завдання #8: ObjectToPropertyDescriptor
+type ObjectToPropertyDescriptor<T> = {
+  [K in keyof T]: IPropertyDescriptor<T>
+};
+const descriptedUser: ObjectToPropertyDescriptor<User> = getObjectDescriptors<User>(user);
+console.log(descriptedUser);
+
+function getObjectDescriptors<T>(obj: T) {
+  let res: any = {};
+  for (const key in obj) {
+    res[key] = Object.getOwnPropertyDescriptor(obj, key);
+  }
+  return res;
+}
