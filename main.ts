@@ -89,7 +89,7 @@ readonlyByKeysUser.name = 'Oleg';
 type MutabaleByKeys<T, K extends keyof T> = {
   -readonly [P in keyof T as P extends K ? P : never]: T[P]
 } & {
-  [P in keyof T as P extends K ? never : never]: T[P]
+  [P in keyof T as P extends K ? never : P]: T[P]
 }
 const mutableByKeysUser: MutabaleByKeys<User, 'name'> = { ...readonlyByKeysUser };
 mutableByKeysUser.name = 'Oleg';
